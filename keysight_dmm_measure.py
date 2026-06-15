@@ -91,12 +91,8 @@ def parse_args():
     parser.add_argument("n_samples", type=int,
                         help = "number of samples ")
 
-    # we return a dictionary, as this is easy to create in case we
-    # want to drive program without command line arguments
-    # (see: https://stackoverflow.com/q/16878315 ):
-    return vars(parser.parse_args())
+    return vars(parser.parse_args())  # return dictionary
         
 if __name__ == "__main__":
-    # each sample takes 2.6 s
     args = parse_args()
     main(args)
