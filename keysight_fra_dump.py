@@ -1,11 +1,12 @@
-"""Utilities for getting a frequency response analysis (FRA) from a
-Keysight scope"""
+"""Get frequency response analysis (FRA) from a Keysight DSOX1102G \
+oscilloscope
+"""
 
 # For the format of the FRA data returned from scopes, see:
 # "Keysight InfiniiVision 1200 X-Series and EDUX1052A/G Oscilloscopes,
 # Programmer's guide" esp. Section 16, ":FRANalysis Commands"
 
-import sys, os.path
+import sys, os.path, argparse, __main__
 import pyvisa
 import warnings
 warnings.simplefilter("ignore", UserWarning)
@@ -42,41 +43,48 @@ def write_fra_to_csv(inst, csvfilename):
         f.write(csv_string)
     return parse_fra_csv(csv_string)
 
-
-if __name__ == "__main__":
-    # if run with no arguments returns the list of resources available
+def main(args):
+    csv_fname = args["csv_filename"]    
     
     rm = pyvisa.ResourceManager()    
-    if len(sys.argv) == 1:  # no arguments; show available visa resources
-        lor = rm.list_resources()
-        print(f"list of resources: {lor=}")
-        for r in lor:
-            if "ASRL" in r:
-                continue
-            if "hislip0" in r:
-                continue
-            inst = rm.open_resource(r)
-            print(f"opening: {inst=}")
-            print(f"{r=} {inst.query('*IDN?')=}")
-            inst.close()
-        exit(0)
-    
-    if len(sys.argv) != 3:
-        raise RuntimeError(
-            "Provide two arguments: visa resource name and output filename.")
-        exit(1)
+    rs = rm.list_resources()
 
-    rs_name = sys.argv[1]
-    csv_fname = sys.argv[2]
-    
+    for r in rs:
+        if "::0x2A8D::0x1797::" in r:  # VISA name for Keysight DSOX1102G
+            inst = rm.open_resource(r)
+            break
+    else:
+        raise RuntimeError(
+            "Could not detect Keysight scope.  Is it connected?")
+     
     if os.path.isfile(csv_fname):
         raise RuntimeError(f"File already exists: {csv_fname}")
 
-    inst = rm.open_resource(rs_name)            
-    data = write_fra_to_csv(inst, sys.argv[2])
+    data = write_fra_to_csv(inst, csv_fname)
 
+    # plot data:
     plt.plot(data["freq_hz"], data["gain_db"])
     ax = plt.gca()
     ax.set_xscale("log")
+    ax.set_xlabel("frequency (Hz)")
+    ax.set_ylabel("voltage gain (dB)")
     plt.show()
 
+def parse_args():
+    example_of_use = "Example usage:\n " +  __main__.__file__ + " --debug 1"
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     epilog=example_of_use,
+                                     formatter_class=
+                                     argparse.RawTextHelpFormatter)
+    parser.add_argument("--debug",
+                        help = "print additional debug info ",
+                        default=False, action="store_true")
+
+    parser.add_argument("csv_filename", type=str,
+                        help = "filename for csv output")
+
+    return vars(parser.parse_args())  # return dictionary
+        
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
