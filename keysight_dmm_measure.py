@@ -42,7 +42,7 @@ def main(args):
         # make measurement:
         print("Measuring ... will take approximately: ",
               "%.1f" % (n_samples * 2.6),
-              "(s) =(%.1f" % (n_samples * 2.6 / 60), "(min))")
+              "(s) (=%.1f" % (n_samples * 2.6 / 60), "(min))")
         start = time.time()
         while True:
             results = inst.query("READ?")
@@ -58,7 +58,8 @@ def main(args):
         time_elapsed_s = stop - start
         vals = np.array([float(x) for x in results.split(",")])
         avg_vrms2 = np.mean(vals**2)
-        est_std_avg_vrms2 = np.sqrt(np.std(vals**2)**2 / (len(vals) - 1))
+        estimated_error_avg_vrms2 = (
+            np.sqrt(np.std(vals**2)**2 / (len(vals) - 1)))
 
         # print results to screen:
         print("\nSuccess!\n")
@@ -67,7 +68,7 @@ def main(args):
         print(f"{np.sqrt(avg_vrms2)=} V")
         print()
         print(f"{avg_vrms2=} V^2")
-        print(f"{est_std_avg_vrms2=} V^2")        
+        print(f"{estimated_error_avg_vrms2=} V^2")        
 
     except Exception as e:
         print(e)        
