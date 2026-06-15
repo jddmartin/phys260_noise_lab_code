@@ -2,7 +2,7 @@
 
 # written by J. Martin, U Waterloo
 
-import time, subprocess, os, argparse, __main__
+import time, subprocess, os, argparse, datetime, __main__
 
 import pyvisa
 import numpy as np
@@ -20,7 +20,8 @@ def main(args):
             inst = rm.open_resource(r)
             break
     else:
-        raise RuntimeError("Could not detect Keysight 34461A.  Is it connected?")
+        raise RuntimeError(
+            "Could not detect Keysight 34461A.  Is it connected?")
     try:
         if debug: print(f'{inst.query("*IDN?")=}')    
         inst.timeout = 1000000
@@ -36,11 +37,10 @@ def main(args):
         inst.write("CONF:VOLT:AC 1")
         
         inst.write("VOLT:AC:BAND 3") # 3 20 200
-        n_samples = 10
         inst.write("SAMPLE:COUNT " + str(n_samples))
 
         # make measurement:
-        print("Measuring ... will take approximately: ",
+        print("Measuring ...", n_samples, "samples, will take approximately: ",
               "%.1f" % (n_samples * 2.6),
               "(s) (=%.1f" % (n_samples * 2.6 / 60), "(min))")
         start = time.time()
@@ -62,7 +62,8 @@ def main(args):
             np.sqrt(np.std(vals**2)**2 / (len(vals) - 1)))
 
         # print results to screen:
-        print("\nSuccess!\n")
+        datestring = str(datetime.datetime.now().astimezone())
+        print("\nSuccess! Finished at: " + datestring + "\n")
         print(f"{time_elapsed_s=}")
 
         print(f"{np.sqrt(avg_vrms2)=} V")
@@ -87,7 +88,7 @@ def parse_args():
                         help = "print additional debug info ",
                         default=False, action="store_true")
 
-    parser.add_argument("n_samples",
+    parser.add_argument("n_samples", type=int,
                         help = "number of samples ")
 
     # we return a dictionary, as this is easy to create in case we
