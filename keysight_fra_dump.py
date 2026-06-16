@@ -2,16 +2,21 @@
 oscilloscope
 """
 
+# written by J. Martin, U Waterloo
+
 # For the format of the FRA data returned from scopes, see:
 # "Keysight InfiniiVision 1200 X-Series and EDUX1052A/G Oscilloscopes,
 # Programmer's guide" esp. Section 16, ":FRANalysis Commands"
 
-import sys, os.path, argparse, __main__
+import sys, os.path, argparse, datetime, __main__
 import pyvisa
 import warnings
 warnings.simplefilter("ignore", UserWarning)
 import matplotlib.pyplot as plt
 import numpy as np
+np.set_printoptions(legacy='1.25')
+import pandas as pd
+import scipy.integrate as si
 
 def get_fra_as_csv(inst):
     """Ask "inst" for FRA data and return resulting csv string"""
@@ -43,6 +48,13 @@ def write_fra_to_csv(inst, csvfilename):
         f.write(csv_string)
     return parse_fra_csv(csv_string)
 
+def read_edu1052g_bode(afilename):
+    df = pd.read_csv(afilename, encoding = "ISO-8859-1")
+    fs = df[df.keys()[1]].to_numpy()
+    gains = df[df.keys()[3]].to_numpy()
+    phases = np.unwrap(df[df.keys()[4]].to_numpy(), period=360)
+    return dict(fs=fs, gains=gains, phases=phases)
+
 def main(args):
     csv_fname = args["csv_filename"]    
     
@@ -61,6 +73,15 @@ def main(args):
         raise RuntimeError(f"File already exists: {csv_fname}")
 
     data = write_fra_to_csv(inst, csv_fname)
+
+    sys = read_edu1052g_bode(csv_fname)
+    datestring = str(datetime.datetime.now().astimezone())
+    print("\nSuccess! Finished at: " + datestring)
+    print(f"{min(sys['fs'])=}, {max(sys['fs'])=}, {len(sys['fs'])=},")
+    tv_corr_gain = 10**(sys["gains"]/20)
+    noise_bandwidth = si.simpson(tv_corr_gain**2, x=sys["fs"])
+    print(f"{noise_bandwidth=:.6g} Hz")
+    print("Close figure window to finish.")
 
     # plot data:
     plt.plot(data["freq_hz"], data["gain_db"])
