@@ -64,6 +64,7 @@ def main(args):
         # print results to screen:
         datestring = str(datetime.datetime.now().astimezone())
         print("\nSuccess! Finished at: " + datestring + "\n")
+        print("\007")
         print(f"{time_elapsed_s=}")
 
         print(f"{np.sqrt(avg_vrms2)=} V")
