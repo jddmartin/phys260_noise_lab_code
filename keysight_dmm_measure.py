@@ -43,6 +43,7 @@ def main(args):
         print("Measuring ...", n_samples, "samples, will take approximately: ",
               "%.1f" % (n_samples * 2.6),
               "(s) (=%.1f" % (n_samples * 2.6 / 60), "(min))")
+        print("Turn volume up for audio alert when finished")
         start = time.time()
         while True:
             results = inst.query("READ?")
