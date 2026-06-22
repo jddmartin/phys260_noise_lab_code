@@ -11,6 +11,7 @@ np.set_printoptions(legacy='1.25')
 
 def main(args):
     debug = args["debug"]
+    logfile = args["logfile"]
 
     while True:
         rm = pyvisa.ResourceManager()        
@@ -35,10 +36,14 @@ def main(args):
             utc_now = datetime.now().astimezone()
             utc_now_isoformat = utc_now.isoformat()
             resistance = float(inst_dmm.query("MEAS:RES?"))
-            current = float(inst_pwr.query("CURR? (@1)"))
+            
+            # CURR? gives setpoint, even when output is disabled,
+            # whereas MEAS:CURR? gives actual current
+            # current = float(inst_pwr.query("CURR? (@1)"))
+            current = float(inst_pwr.query("MEAS:CURR? CH1"))
             print(
                 f"{utc_now_isoformat=}, {atime=}, {resistance=}, {current=}")
-            with open("log.csv", "a", newline="") as csvfile:
+            with open(logfile, "a", newline="") as csvfile:
                 csvwriter = csv.writer(csvfile)
                 csvwriter.writerow(
                     [utc_now_isoformat, atime, resistance, current,])
