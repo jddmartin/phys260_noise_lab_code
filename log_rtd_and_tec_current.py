@@ -9,56 +9,82 @@ import pyvisa
 import numpy as np
 np.set_printoptions(legacy='1.25')
 
+
+def find_single_matching_visa_resource_name(device_description,
+                                            requested_visa_name):
+    """Helper function for acquiring a visa resource that looks for
+    one and only one visa name that has the "requested_visa_name" within it.
+    Throws exception if either no or more than one matching visa name
+    is present.
+    """
+
+    rm = pyvisa.ResourceManager()        
+    rs = rm.list_resources()
+
+    n_found = 0
+    for r in rs:
+        if requested_visa_name in r:
+            n_found += 1
+            vname = r # lock visaname we use
+            
+    if n_found == 0:
+        error_message = (
+            f"No {device_description} found in "
+            +f"visa resources: {rs}")            
+        raise RuntimeError(error_message)
+
+    elif n_found > 1:
+        error_message = (
+            f"More than one {device_description} found in "
+            +f"visa resources: {rs}")    
+        raise RuntimeError(error_message)
+
+    return vname
+    
+
 def main(args):
     debug = args["debug"]
     logfile = args["logfile"]
+    
+    pwr_supply_vname = find_single_matching_visa_resource_name(
+        "power supply", args["pwr_supply_visa_resource_name"])
 
+    dmm_vname = find_single_matching_visa_resource_name(
+        "DMM", args["dmm_visa_resource_name"])
+
+    first = True
     while True:
-        rm = pyvisa.ResourceManager()        
-        rs = rm.list_resources()
-        if debug: print(f"{rs=}")
-        try:
-            for r in rs:
-                if "::0x2A8D::0x8F01::" in r:  # VISA name for Keysight EDU36311A
-                    inst_pwr = rm.open_resource(r)
-                    break
-            else:
-                raise RuntimeError(
-                    "Could not detect Keysight EDU36311A.  Is it connected?")
-            for r in rs:
-                if "::0x2A8D::0x1301::" in r:  # VISA name for Keysight 34461A
-                    inst_dmm = rm.open_resource(r)
-                    break
-            else:
-                raise RuntimeError(
-                    "Could not detect Keysight 34461A.  Is it connected?")
-            atime = time.time()
-            utc_now = datetime.now().astimezone()
-            utc_now_isoformat = utc_now.isoformat()
-            resistance = float(inst_dmm.query("MEAS:RES?"))
+        if not first:
+            first = False
+            time.sleep(args["sleep_time"])            
             
-            # CURR? gives setpoint, even when output is disabled,
-            # whereas MEAS:CURR? gives actual current
-            # current = float(inst_pwr.query("CURR? (@1)"))
-            current = float(inst_pwr.query("MEAS:CURR? CH1"))
-            print(
-                f"{utc_now_isoformat=}, {atime=}, {resistance=}, {current=}")
-            with open(logfile, "a", newline="") as csvfile:
-                csvwriter = csv.writer(csvfile)
-                csvwriter.writerow(
-                    [utc_now_isoformat, atime, resistance, current,])
+        atime = time.time()
+        utc_now = datetime.now().astimezone()
+        utc_now_isoformat = utc_now.isoformat()
 
+        rm = pyvisa.ResourceManager()        
+        try:  # make power supply measurements:
+            pwr_supply = rm.open_resource(pwr_supply_vname)
+            current = float(pwr_supply.query("MEAS:CURR? CH1"))
+            pwr.control_ren(6)            
+            pwr.close()
+        except:
+            continue
 
-        except Exception as e:
-            print(e)
-
-        inst_pwr.control_ren(6)            
-        inst_pwr.close()
-
-        inst_dmm.control_ren(6)
-        inst_dmm.close()
-
-        time.sleep(10)            
+        try:  # make resistance measurements:
+            dmm = rm.open_resource(dmm_vname)
+            resistance = float(dmm.query("MEAS:RES?"))
+            dmm.control_ren(6)            
+            dmm.close()
+        except:
+            continue
+        
+        print(
+            f"{utc_now_isoformat=}, {atime=}, {resistance=}, {current=}")
+        with open(logfile, "a", newline="") as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(
+                [utc_now_isoformat, atime, resistance, current,])
 
 
 def parse_args():
@@ -70,6 +96,21 @@ def parse_args():
     parser.add_argument("--debug",
                         help = "print additional debug info ",
                         default=False, action="store_true")
+
+    parser.add_argument(
+        "--sleep_time", float,
+        help="sleep time (s) between measurements",
+        default=10.0)
+    
+    parser.add_argument(
+        "--pwr_supply_visa_resource_name", str,
+        help="DMM visa resource name; can be partial",
+        default="::0x2A8D::0x8F01::")
+    
+    parser.add_argument(
+        "--dmm_visa_resource_name", str,
+        help="DMM visa resource name; can be partial",
+        default="::0x2A8D::0x1301::")
 
     parser.add_argument("logfile", type=str,
                         help = "log file to append to ",)
