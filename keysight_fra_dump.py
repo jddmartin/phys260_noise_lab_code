@@ -94,37 +94,27 @@ def find_single_matching_visa_resource_name(device_description,
 
 
 def main(args):
-    csv_fname = args["csv_filename"]    
+    dump_csv_fname = args["dump_csv_filename"]    
     logfile = args["logfile"]
     
     oscope_vname = find_single_matching_visa_resource_name(
-        "OSCOPE", args["oscope_visa_resource_name"], debug=debug)
+        "oscilloscope", args["oscope_visa_resource_name"], debug=debug)
     if debug:
         print(f"found {oscope_vname=}")
+
+    rm = pyvisa.ResourceManager()            
     oscope = rm.open_resource(oscope_vname)    
-    
-    rm = pyvisa.ResourceManager()    
-    rs = rm.list_resources()
-
-    for r in rs:
-        if "::0x2A8D::0x1797::" in r:  # VISA name for Keysight DSOX1102G
-            inst = rm.open_resource(r)
-            break
-    else:
-        raise RuntimeError(
-            "Could not detect Keysight scope.  Is it connected?")
      
-    if os.path.isfile(csv_fname):
-        raise RuntimeError(f"File already exists: {csv_fname}")
-
+    if os.path.isfile(dump_csv_fname):
+        raise RuntimeError(f"File already exists: {dump_csv_fname}")
 
     start = time.time()
     utc_now = datetime.now().astimezone()
     utc_now_isoformat = utc_now.isoformat()
     
-    data = write_fra_to_csv(inst, csv_fname)
+    data = write_fra_to_csv(oscope, dump_csv_fname)
 
-    sys = read_edu1052g_bode(csv_fname)
+    sys = read_edu1052g_bode(dump_csv_fname)
     print("\nSuccess! Finished at: " + utc_now_isoformat)
     print(f"{min(sys['fs'])=}, {max(sys['fs'])=}, {len(sys['fs'])=},")
     tv_corr_gain = 10**(sys["gains"]/20)
@@ -135,7 +125,7 @@ def main(args):
     with open(logfile, "a", newline="") as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(
-            [utc_now_isoformat, start, csv_fname,
+            [utc_now_isoformat, start, dump_csv_fname,
              comment,
              noise_bandwidth,
              ])
@@ -171,11 +161,11 @@ def parse_args():
 
     parser.add_argument(
         "--comment", type=str,
-        help="comment to write to *.csv",
+        help="comment to write to .csv logfile",
         default="")
 
     parser.add_argument("csv_filename", type=str,
-                        help = "filename for csv output")
+                        help = "csv filename for dumped output")
 
     return vars(parser.parse_args())  # return dictionary
         
