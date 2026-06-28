@@ -112,17 +112,16 @@ def main(args):
 
         # print results to screen:
         datestring = str(datetime.now().astimezone())
-        print("\nSuccess! Finished at: " + datestring + "\n")
-        print("\007")
+        print("\nSuccess! Finished at: " + datestring)
         print(f"{time_elapsed_s=}")
-
         print(f"{np.sqrt(avg_vrms2)=} V")
-        print()
         print(f"{avg_vrms2=} V^2")
         print(f"{estimated_error_avg_vrms2=} V^2")        
 
         if os.name == "posix":  # "posix" is linux, "nt" is windows
             subprocess.call(["espeak", "I am finished, my friend."])
+        else:
+            print("\007")
 
         with open(logfile, "a", newline="") as csvfile:
             csvwriter = csv.writer(csvfile)
