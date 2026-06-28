@@ -50,7 +50,7 @@ def main(args):
     n_samples = args["n_samples"]
     logfile = args["logfile"]
     repeat = args["repeat"]
-    comment =args["commment"]
+    comment =args["comment"]
 
     dmm_vname = find_single_matching_visa_resource_name(
         "DMM", args["dmm_visa_resource_name"], debug=debug)
