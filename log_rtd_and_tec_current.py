@@ -2,7 +2,7 @@
 
 # written by J. Martin, U Waterloo
 
-import time, subprocess, os, argparse, csv, __main__
+import time, subprocess, os, os.path, argparse, csv, __main__
 from datetime import datetime, timezone
 
 import pyvisa
@@ -88,8 +88,8 @@ def main(args):
             resistance = float(dmm.query("MEAS:RES?"))
             dmm.control_ren(6)            
             dmm.close()
-        except:
-            print("dmm supply busy? skipping, will retry ...")            
+        except pyvisa.errors.VisaIOError as e:            
+            print("dmm busy? skipping, will retry ...")            
             continue
         
         print(
@@ -101,7 +101,7 @@ def main(args):
 
 
 def parse_args():
-    example_of_use = "Example usage:\n " +  __main__.__file__ + " --debug 1"
+    example_of_use = "Example usage:\n " +  __main__.__file__ + " --debug"
     parser = argparse.ArgumentParser(description=__doc__,
                                      epilog=example_of_use,
                                      formatter_class=
@@ -125,9 +125,13 @@ def parse_args():
         help="DMM visa resource name; can be partial",
         default="::0x2A8D::0x1301::")
 
-    parser.add_argument("logfile", type=str,
-                        help = "log file to append to ",)
 
+    main_filename_base, _ = os.path.splitext(
+        os.path.split(__main__.__file__)[-1])
+    parser.add_argument("--logfile", type=str,
+                        help = "log file to append to ",
+                        default=(main_filename_base+".csv"))
+    
     return vars(parser.parse_args())  # return dictionary
         
 if __name__ == "__main__":
