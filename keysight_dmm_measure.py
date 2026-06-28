@@ -50,6 +50,7 @@ def main(args):
     n_samples = args["n_samples"]
     logfile = args["logfile"]
     repeat = args["repeat"]
+    comment =args["commment"]
 
     dmm_vname = find_single_matching_visa_resource_name(
         "DMM", args["dmm_visa_resource_name"], debug=debug)
@@ -127,6 +128,7 @@ def main(args):
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(
                 [utc_now_isoformat, start,
+                 comment,
                  len(vals),
                  sqrt_avg_vrms2,                 
                  avg_vrms2,
@@ -164,6 +166,12 @@ def parse_args():
     parser.add_argument("--logfile", type=str,
                         help = "log file to append to ",
                         default=(main_filename_base+".csv"))
+
+    parser.add_argument(
+        "--comment", type=str,
+        help="comment to write to *.csv",
+        default="")
+
 
     return vars(parser.parse_args())  # return dictionary
         

@@ -49,6 +49,7 @@ def find_single_matching_visa_resource_name(device_description,
 def main(args):
     debug = args["debug"]
     logfile = args["logfile"]
+    comment = args["comment"]
     
     pwr_supply_vname = find_single_matching_visa_resource_name(
         "power supply", args["pwr_supply_visa_resource_name"],
@@ -97,7 +98,9 @@ def main(args):
         with open(logfile, "a", newline="") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(
-                [utc_now_isoformat, atime, resistance, current,])
+                [utc_now_isoformat, atime,
+                 comment,
+                 resistance, current,])
 
 
 def parse_args():
@@ -125,12 +128,17 @@ def parse_args():
         help="DMM visa resource name; can be partial",
         default="::0x2A8D::0x1301::")
 
-
     main_filename_base, _ = os.path.splitext(
         os.path.split(__main__.__file__)[-1])
     parser.add_argument("--logfile", type=str,
                         help = "log file to append to ",
                         default=(main_filename_base+".csv"))
+
+    parser.add_argument(
+        "--comment", type=str,
+        help="comment to write to *.csv",
+        default="")
+
     
     return vars(parser.parse_args())  # return dictionary
         
