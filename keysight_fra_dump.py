@@ -8,7 +8,8 @@ oscilloscope
 # "Keysight InfiniiVision 1200 X-Series and EDUX1052A/G Oscilloscopes,
 # Programmer's guide" esp. Section 16, ":FRANalysis Commands"
 
-import sys, os.path, argparse, datetime, __main__
+import sys, os, os.path, argparse, csv, __main__
+from datetime import datetime, timezone
 import pyvisa
 import warnings
 warnings.simplefilter("ignore", UserWarning)
@@ -55,8 +56,52 @@ def read_edu1052g_bode(afilename):
     phases = np.unwrap(df[df.keys()[4]].to_numpy(), period=360)
     return dict(fs=fs, gains=gains, phases=phases)
 
+
+def find_single_matching_visa_resource_name(device_description,
+                                            requested_visa_name,
+                                            debug=False):
+    """Helper function for acquiring a visa resource that looks for
+    one and only one visa name that has the "requested_visa_name" within it.
+    Throws exception if either no or more than one matching visa resource
+    is present.
+    """
+
+    rm = pyvisa.ResourceManager()        
+    rs = rm.list_resources()
+
+    if debug:
+        print(f"found resources {rs=}")
+
+    n_found = 0
+    for r in rs:
+        if requested_visa_name in r:
+            n_found += 1
+            vname = r # lock visaname we use
+            
+    if n_found == 0:
+        error_message = (
+            f"No {device_description} found in "
+            +f"visa resources: {rs}")            
+        raise RuntimeError(error_message)
+
+    elif n_found > 1:
+        error_message = (
+            f"More than one {device_description} found in "
+            +f"visa resources: {rs}")    
+        raise RuntimeError(error_message)
+
+    return vname
+
+
 def main(args):
     csv_fname = args["csv_filename"]    
+    logfile = args["logfile"]
+    
+    oscope_vname = find_single_matching_visa_resource_name(
+        "OSCOPE", args["oscope_visa_resource_name"], debug=debug)
+    if debug:
+        print(f"found {oscope_vname=}")
+    oscope = rm.open_resource(oscope_vname)    
     
     rm = pyvisa.ResourceManager()    
     rs = rm.list_resources()
@@ -72,16 +117,28 @@ def main(args):
     if os.path.isfile(csv_fname):
         raise RuntimeError(f"File already exists: {csv_fname}")
 
+
+    start = time.time()
+    utc_now = datetime.now().astimezone()
+    utc_now_isoformat = utc_now.isoformat()
+    
     data = write_fra_to_csv(inst, csv_fname)
 
     sys = read_edu1052g_bode(csv_fname)
-    datestring = str(datetime.datetime.now().astimezone())
-    print("\nSuccess! Finished at: " + datestring)
+    print("\nSuccess! Finished at: " + utc_now_isoformat)
     print(f"{min(sys['fs'])=}, {max(sys['fs'])=}, {len(sys['fs'])=},")
     tv_corr_gain = 10**(sys["gains"]/20)
     noise_bandwidth = si.simpson(tv_corr_gain**2, x=sys["fs"])
     print(f"{noise_bandwidth=:.6g} Hz")
     print("Close figure window to finish.")
+
+    with open(logfile, "a", newline="") as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(
+            [utc_now_isoformat, start, csv_fname,
+             comment,
+             noise_bandwidth,
+             ])
 
     # plot data:
     plt.plot(data["freq_hz"], data["gain_db"])
@@ -100,6 +157,22 @@ def parse_args():
     parser.add_argument("--debug",
                         help = "print additional debug info ",
                         default=False, action="store_true")
+
+    parser.add_argument(
+        "--oscope_visa_resource_name", type=str,
+        help="oscilloscope visa resource name; can be partial",
+        default="::0x2A8D::0x1797::")
+
+    main_filename_base, _ = os.path.splitext(
+        os.path.split(__main__.__file__)[-1])
+    parser.add_argument("--logfile", type=str,
+                        help = "log file to append to ",
+                        default=(main_filename_base+".csv"))
+
+    parser.add_argument(
+        "--comment", type=str,
+        help="comment to write to *.csv",
+        default="")
 
     parser.add_argument("csv_filename", type=str,
                         help = "filename for csv output")
