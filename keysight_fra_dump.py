@@ -54,8 +54,10 @@ def read_edu1052g_bode(afilename):
     fs = df[df.keys()[1]].to_numpy()
     gains = df[df.keys()[3]].to_numpy()
     phases = np.unwrap(df[df.keys()[4]].to_numpy(), period=360)
-    return dict(fs=fs, gains=gains, phases=phases)
-
+    tv_corr_gain = 10**(gains/20)
+    noise_bandwidth = si.simpson(tv_corr_gain**2, x=fs)
+    return dict(fs=fs, gains=gains, phases=phases,
+                noise_bandwidth=noise_bandwidth)
 
 def find_single_matching_visa_resource_name(device_description,
                                             requested_visa_name,
@@ -116,9 +118,7 @@ def main(args):
 
     sys = read_edu1052g_bode(dump_csv_fname)
     print("\nSuccess! Finished at: " + utc_now_isoformat)
-    print(f"{min(sys['fs'])=}, {max(sys['fs'])=}, {len(sys['fs'])=},")
-    tv_corr_gain = 10**(sys["gains"]/20)
-    noise_bandwidth = si.simpson(tv_corr_gain**2, x=sys["fs"])
+    noise_bandwidth = sys["noise_bandwidth"]
     print(f"{noise_bandwidth=:.6g} Hz")
     print("Close figure window to finish.")
 
