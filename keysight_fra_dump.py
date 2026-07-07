@@ -164,7 +164,7 @@ def parse_args():
         help="comment to write to .csv logfile",
         default="")
 
-    parser.add_argument("csv_filename", type=str,
+    parser.add_argument("dump_csv_filename", type=str,
                         help = "csv filename for dumped output")
 
     return vars(parser.parse_args())  # return dictionary
