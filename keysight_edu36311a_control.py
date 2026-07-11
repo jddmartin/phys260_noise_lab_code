@@ -8,24 +8,59 @@ import pyvisa
 import numpy as np
 np.set_printoptions(legacy='1.25')
 
+
+def find_single_matching_visa_resource_name(device_description,
+                                            requested_visa_name,
+                                            debug=False):
+    """Helper function for acquiring a visa resource that looks for
+    one and only one visa name that has the "requested_visa_name" within it.
+    Throws exception if either no or more than one matching visa resource
+    is present.
+    """
+
+    rm = pyvisa.ResourceManager()
+    rs = rm.list_resources()
+
+    if debug:
+        print(f"found resources {rs=}")
+
+    n_found = 0
+    for r in rs:
+        if requested_visa_name in r:
+            n_found += 1
+            vname = r # lock visaname we use
+
+    if n_found == 0:
+        error_message = (
+            f"No {device_description} found in "
+            +f"visa resources: {rs}")
+        raise RuntimeError(error_message)
+
+    elif n_found > 1:
+        error_message = (
+            f"More than one {device_description} found in "
+            +f"visa resources: {rs}")
+        raise RuntimeError(error_message)
+
+    return vname
+
+
 def main(args):
     command = args["command"]
     print(f"{command=}")
     debug = args["debug"]
 
-    
+    pwr_supp_vname = find_single_matching_visa_resource_name(
+        "power supply", args["pwr_supp_visa_resource_name"], debug=debug)
+    if debug:
+        print(f"found {pwr_supp_vname=}")
+
     rm = pyvisa.ResourceManager()
-    rs = rm.list_resources()
-    if debug: print(f"{rs=}")
-    for r in rs:
-        if "::0x2A8D::0x8F01::" in r:  # VISA name for Keysight EDU36311A
-            inst = rm.open_resource(r)
-            break
-    else:
-        raise RuntimeError(
-            "Could not detect Keysight 34461A.  Is it connected?")
+
+    inst = rm.open_resource(pwr_supp_vname)
+
     try:
-        if debug: print(f'{inst.query("*IDN?")=}')    
+        if debug: print(f'{inst.query("*IDN?")=}')
         inst.timeout = 1000000
 
         if command == "tec_current":
@@ -37,17 +72,14 @@ def main(args):
             print(f"{resp=}")
         elif command == "nab_config":
             inst.write("VOLT 15, (@2)")
-            inst.write("CURR 0.050, (@2)")            
+            inst.write("CURR 0.050, (@2)")
             inst.write("VOLT 15, (@3)")
-            inst.write("CURR 0.050, (@3)")            
+            inst.write("CURR 0.050, (@3)")
 
     except Exception as e:
         print(e)
     finally:
         inst.control_ren(6)
-
-    if os.name == "posix":  # "posix" is linux, "nt" is windows
-        subprocess.call(["espeak", "I am finished, my friend."])
 
 def parse_args():
     example_of_use = "Example usage:\n " +  __main__.__file__ + " --debug 1"
@@ -58,6 +90,12 @@ def parse_args():
     parser.add_argument("--debug",
                         help = "print additional debug info ",
                         default=False, action="store_true")
+
+    parser.add_argument(
+        "--pwr_supp_visa_resource_name", type=str,
+        help="Power supply visa resource name; can be partial",
+        default="::0x2A8D::0x8F01::")
+
 
     subparsers = parser.add_subparsers(help="sub-command help",
         dest="command",  # will hold subcommand name as string
@@ -74,7 +112,7 @@ def parse_args():
     parser_set = subparsers.add_parser("nab_config", help="help for set")
 
     return vars(parser.parse_args())  # return dictionary
-        
+
 if __name__ == "__main__":
     args = parse_args()
     main(args)

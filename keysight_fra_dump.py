@@ -8,7 +8,7 @@ oscilloscope
 # "Keysight InfiniiVision 1200 X-Series and EDUX1052A/G Oscilloscopes,
 # Programmer's guide" esp. Section 16, ":FRANalysis Commands"
 
-import sys, os, os.path, argparse, csv, __main__
+import time, sys, os, os.path, argparse, csv, __main__
 from datetime import datetime, timezone
 import pyvisa
 import warnings
@@ -96,8 +96,10 @@ def find_single_matching_visa_resource_name(device_description,
 
 
 def main(args):
+    debug = args["debug"]
     dump_csv_fname = args["dump_csv_filename"]    
     logfile = args["logfile"]
+    comment = args["comment"]
     
     oscope_vname = find_single_matching_visa_resource_name(
         "oscilloscope", args["oscope_visa_resource_name"], debug=debug)
