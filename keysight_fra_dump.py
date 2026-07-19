@@ -132,13 +132,13 @@ def main(args):
              noise_bandwidth,
              ])
 
-    # plot data:
-    plt.plot(data["freq_hz"], data["gain_db"])
-    ax = plt.gca()
-    ax.set_xscale("log")
-    ax.set_xlabel("frequency (Hz)")
-    ax.set_ylabel("voltage gain (dB)")
-    plt.show()
+    if not args["noplot"]:  # plot data:
+        plt.plot(data["freq_hz"], data["gain_db"])
+        ax = plt.gca()
+        ax.set_xscale("log")
+        ax.set_xlabel("frequency (Hz)")
+        ax.set_ylabel("voltage gain (dB)")
+        plt.show()
 
 def parse_args():
     example_of_use = "Example usage:\n " +  __main__.__file__ + " --debug 1"
@@ -165,6 +165,9 @@ def parse_args():
         "--comment", type=str,
         help="comment to write to .csv logfile",
         default="")
+
+    parser.add_argument(
+        "--noplot", default=False, action="store_true")
 
     parser.add_argument("dump_csv_filename", type=str,
                         help = "csv filename for dumped output")
