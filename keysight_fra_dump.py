@@ -19,6 +19,15 @@ np.set_printoptions(legacy='1.25')
 import pandas as pd
 import scipy.integrate as si
 
+def run_fra(inst):
+    # clear event status register (ESR) before starting:
+    esr = inst.query("*ESR?")
+    inst.write(":FRAN:RUN")
+    while True:
+        esr = inst.query("*ESR?")
+        if (int(esr) & 1) == 1:
+            break
+
 def get_fra_as_csv(inst):
     """Ask "inst" for FRA data and return resulting csv string"""
     inst.write(":FRANalysis:DATA?")
@@ -68,7 +77,7 @@ def find_single_matching_visa_resource_name(device_description,
     is present.
     """
 
-    rm = pyvisa.ResourceManager()        
+    rm = pyvisa.ResourceManager()
     rs = rm.list_resources()
 
     if debug:
@@ -79,17 +88,17 @@ def find_single_matching_visa_resource_name(device_description,
         if requested_visa_name in r:
             n_found += 1
             vname = r # lock visaname we use
-            
+
     if n_found == 0:
         error_message = (
             f"No {device_description} found in "
-            +f"visa resources: {rs}")            
+            +f"visa resources: {rs}")
         raise RuntimeError(error_message)
 
     elif n_found > 1:
         error_message = (
             f"More than one {device_description} found in "
-            +f"visa resources: {rs}")    
+            +f"visa resources: {rs}")
         raise RuntimeError(error_message)
 
     return vname
@@ -97,32 +106,43 @@ def find_single_matching_visa_resource_name(device_description,
 
 def main(args):
     debug = args["debug"]
-    dump_csv_fname = args["dump_csv_filename"]    
+    dump_csv_fname = args["dump_csv_filename"]
     logfile = args["logfile"]
     comment = args["comment"]
-    
+
     oscope_vname = find_single_matching_visa_resource_name(
         "oscilloscope", args["oscope_visa_resource_name"], debug=debug)
     if debug:
         print(f"found {oscope_vname=}")
 
-    rm = pyvisa.ResourceManager()            
-    oscope = rm.open_resource(oscope_vname)    
-     
-    if os.path.isfile(dump_csv_fname):
-        raise RuntimeError(f"File already exists: {dump_csv_fname}")
+    rm = pyvisa.ResourceManager()
+    oscope = rm.open_resource(oscope_vname)
+
+    if args["filename_is_precursor"]:
+        precurs = dump_csv_fname
+        start = 0
+        while True:
+            start += 1
+            dump_csv_fname = precurs + str(start) + ".csv"
+            if not os.path.isfile(dump_csv_fname):
+                break
+    else:
+        if os.path.isfile(dump_csv_fname):
+            raise RuntimeError(f"File already exists: {dump_csv_fname}")
+
+    if args["run"]:
+        run_fra(oscope)
 
     start = time.time()
     utc_now = datetime.now().astimezone()
     utc_now_isoformat = utc_now.isoformat()
-    
+
     data = write_fra_to_csv(oscope, dump_csv_fname)
 
     sys = read_edu1052g_bode(dump_csv_fname)
     print("\nSuccess! Finished at: " + utc_now_isoformat)
     noise_bandwidth = sys["noise_bandwidth"]
     print(f"{noise_bandwidth=:.6g} Hz")
-    print("Close figure window to finish.")
 
     with open(logfile, "a", newline="") as csvfile:
         csvwriter = csv.writer(csvfile)
@@ -133,6 +153,7 @@ def main(args):
              ])
 
     if not args["noplot"]:  # plot data:
+        print("Close figure window to finish.")
         plt.plot(data["freq_hz"], data["gain_db"])
         ax = plt.gca()
         ax.set_xscale("log")
@@ -167,13 +188,22 @@ def parse_args():
         default="")
 
     parser.add_argument(
+        "--run", default=False, action="store_true",
+        help="run FRA before dumping")
+
+    parser.add_argument(
         "--noplot", default=False, action="store_true")
+
+    parser.add_argument(
+        "--filename_is_precursor", action="store_true",
+        help="finds unused filename using filename as precursor"
+    )
 
     parser.add_argument("dump_csv_filename", type=str,
                         help = "csv filename for dumped output")
 
     return vars(parser.parse_args())  # return dictionary
-        
+
 if __name__ == "__main__":
     args = parse_args()
     main(args)
